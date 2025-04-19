@@ -44,25 +44,59 @@ struct Block {
 };
 
 template <class Key, class Value>
+int binarySearch(Key_Value<Key, Value>* array, const Key& key, int left,
+                 int right) {
+  if (array[left].key >= key) {
+    return left;
+  }
+  if (array[right].key < key) {
+    return right + 1;
+  }
+  while (left < right) {
+    int mid = (left + right + 1) / 2;
+    if (array[mid].key < key) {
+      left = mid;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return left + 1;
+}
+
+template <class Key>
+int binarySearch(Key* array, const Key& key, int left, int right) {
+  if (array[left] >= key) {
+    return left;
+  }
+  if (array[right] < key) {
+    return right + 1;
+  }
+  while (left < right) {
+    int mid = (left + right + 1) / 2;
+    if (array[mid] < key) {
+      left = mid;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return left + 1;
+}
+
+template <class Key, class Value>
 class BPT {
  public:
   BPT(const std::string& filename = "database")
       : filename_(filename),
         index_file_(filename + ".index"),
-        block_file_(filename + ".block"),
-        root_(-1),
-        head_(-1),
-        height_(0) {
+        block_file_(filename + ".block")
+         {
     if (!index_file_.exist()) {
       index_file_.initialise();
       block_file_.initialise();
       index_file_.write_info(-1, 1);
       block_file_.write_info(-1, 1);
       index_file_.write_info(0, 2);
-    } else {
-      root_ = index_file_.get_info(1);
-      head_ = block_file_.get_info(1);
-      height_ = index_file_.get_info(2);
+      block_file_.write_info(0, 2);
     }
   }
   ~BPT() = default;
@@ -74,7 +108,4 @@ class BPT {
   std::string filename_;
   MemoryRiver<Index<Key, Value>, 2> index_file_;
   MemoryRiver<Block<Key, Value>, 2> block_file_;
-  long root_;
-  long head_;
-  size_t height_;
-}
+};
