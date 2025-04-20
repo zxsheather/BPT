@@ -1,4 +1,6 @@
 #include "MemoryRiver.hpp"
+#include "utility"
+#include "utility.hpp"
 #include "vector.hpp"
 
 constexpr size_t DEFAULT_ORDER = 4;
@@ -9,7 +11,7 @@ struct Key_Value {
   Key key;
   Value value;
 
-  bool operator<(const Key_Value& other) const {
+  bool operator<(const Key_Value &other) const {
     if (key == other.key) {
       return value < other.value;
     }
@@ -44,7 +46,7 @@ struct Block {
 };
 
 template <class Key, class Value>
-int binarySearch(Key_Value<Key, Value>* array, const Key& key, int left,
+int binarySearch(Key_Value<Key, Value> *array, const Key &key, int left,
                  int right) {
   if (array[left].key >= key) {
     return left;
@@ -64,7 +66,7 @@ int binarySearch(Key_Value<Key, Value>* array, const Key& key, int left,
 }
 
 template <class Key>
-int binarySearch(Key* array, const Key& key, int left, int right) {
+int binarySearch(Key *array, const Key &key, int left, int right) {
   if (array[left] >= key) {
     return left;
   }
@@ -85,11 +87,10 @@ int binarySearch(Key* array, const Key& key, int left, int right) {
 template <class Key, class Value>
 class BPT {
  public:
-  BPT(const std::string& filename = "database")
+  BPT(const std::string &filename = "database")
       : filename_(filename),
         index_file_(filename + ".index"),
-        block_file_(filename + ".block")
-         {
+        block_file_(filename + ".block") {
     if (!index_file_.exist()) {
       index_file_.initialise();
       block_file_.initialise();
@@ -100,12 +101,32 @@ class BPT {
     }
   }
   ~BPT() = default;
-  void insert(const Key& key, const Value& value);
-  void remove(const Key& key);
-  sjtu::vector<Value> find(const Key& key);
+  void insert(const Key &key, const Value &value);
+  void remove(const Key &key);
+  sjtu::vector<Value> find(const Key &key);
 
  private:
   std::string filename_;
   MemoryRiver<Index<Key, Value>, 2> index_file_;
   MemoryRiver<Block<Key, Value>, 2> block_file_;
+
+  // search for target leafnode and record the search path
+  long findLeafNode(const Key &key, sjtu::vector<sjtu::pair<long, int>> &path);
+
+  // insert key-value pair and return true if need split
+  bool insertIntoLeaf(long leaf_addr, const Key &key, const Value &value,
+                      Key &split_key, long &new_leaf_addr);
+
+  // handle split logic
+  bool splitLeaf(Block<Key, Value> &leaf, long leaf_addr, int pos,
+                 const Key &key, const Value &value, long &new_leaf_addr);
+
+  // pass the split information to parent node
+  bool insertIntoParent(const sjtu::vector<sjtu::pair<long, int>> &path,
+                        int level, const Key &key, long right_child);
+
+  // split index node
+  bool splitIndex(Index<Key, Value> &node, long node_addr, int pos,
+                  const Key &key, long right_child, Key &split_key,
+                  long &new_node_addr);
 };
