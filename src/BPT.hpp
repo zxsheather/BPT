@@ -19,10 +19,11 @@ struct Key_Value {
   }
 };
 
+//Increment the size of keys to facilitate split
 template <class Key, class Value>
 struct Index {
   long children[DEFAULT_ORDER];
-  Key keys[DEFAULT_ORDER - 1];
+  Key keys[DEFAULT_ORDER];
   size_t size;
 
   Index() : size(0) {
@@ -35,7 +36,7 @@ struct Index {
 template <class Key, class Value>
 struct Block {
   long next;
-  Key_Value<Key, Value> data[DEFAULT_LEAF_SIZE];
+  Key_Value<Key, Value> data[DEFAULT_LEAF_SIZE + 1];
   size_t size;
 
   Block() : next(-1), size(0) {
@@ -118,15 +119,14 @@ class BPT {
                       Key &split_key, long &new_leaf_addr);
 
   // handle split logic
-  bool splitLeaf(Block<Key, Value> &leaf, long leaf_addr, int pos,
-                 const Key &key, const Value &value, long &new_leaf_addr);
+  bool splitLeaf(Block<Key, Value> &leaf, long leaf_addr, Key &split_key,
+                 long &new_leaf_addr);
 
   // pass the split information to parent node
   bool insertIntoParent(const sjtu::vector<sjtu::pair<long, int>> &path,
                         int level, const Key &key, long right_child);
 
   // split index node
-  bool splitIndex(Index<Key, Value> &node, long node_addr, int pos,
-                  const Key &key, long right_child, Key &split_key,
+  bool splitInternal(Index<Key, Value> &node, long node_addr, Key &split_key,
                   long &new_node_addr);
 };
