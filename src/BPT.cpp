@@ -137,7 +137,7 @@ bool BPT<Key, Value>::splitLeaf(Block<Key, Value> &leaf, long leaf_addr,
   new_leaf.next = leaf.next;
   split_key = new_leaf.data[0].key;
   new_leaf_addr = block_file_.write(new_leaf);
-  new_leaf.next = new_leaf_addr;
+  leaf.next = new_leaf_addr;
   block_file_.update(leaf, leaf_addr);
 
   return true;
@@ -149,7 +149,7 @@ bool BPT<Key, Value>::insertIntoParent(
     long right_child) {
   Index<Key, Value> parent;
 
-  if(level < 0){
+  if (level < 0) {
     Index<Key, Value> new_root;
     new_root.size = 1;
     new_root.keys[0] = key;
@@ -160,7 +160,7 @@ bool BPT<Key, Value>::insertIntoParent(
     index_file_.write_info(new_root_addr, 1);
     int height;
     index_file_.get_info(height, 2);
-    index_file_.write_info(height+1, 2);
+    index_file_.write_info(height + 1, 2);
     return true;
   }
   auto [parent_addr, child_idx] = path[level];
@@ -180,12 +180,30 @@ bool BPT<Key, Value>::insertIntoParent(
 
   Key new_split_key;
   long new_index_addr;
-  bool result = splitInternal(parent, parent_addr,  new_split_key,
-                           new_index_addr);
+  bool result =
+      splitInternal(parent, parent_addr, new_split_key, new_index_addr);
   if (result) {
     return insertIntoParent(path, level - 1, new_split_key, new_index_addr);
   }
   return false;
+}
+
+template <class Key, class Value>
+bool BPT<Key, Value>::splitInternal(Index<Key, Value> &node, long node_addr,
+                                    Key &split_key, long &new_node_addr) {
+  Index<Key, Value> new_node;
+  int split_pos = DEFAULT_ORDER / 2;
+  new_node.size=DEFAULT_ORDER-split_pos-1;
+  for(int i=0;i<new_node.size;++i){
+    new_node.keys[i]=node.keys[i+split_pos+1];
+    new_node.children[i]=node.children[i+split_pos+1];
+  }
+  new_node.children[new_node.size]=node.children[DEFAULT_ORDER];
+  split_key=node.keys[split_pos];
+  node.size=split_pos;
+  index_file_.update(node,node_addr);
+  new_node_addr=index_file_.write(new_node);
+  return true;
 }
 
 template class BPT<int, int>;

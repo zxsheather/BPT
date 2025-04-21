@@ -22,7 +22,7 @@ struct Key_Value {
 //Increment the size of keys to facilitate split
 template <class Key, class Value>
 struct Index {
-  long children[DEFAULT_ORDER];
+  long children[DEFAULT_ORDER+1];
   Key keys[DEFAULT_ORDER];
   size_t size;
 
