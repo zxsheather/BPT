@@ -2,6 +2,7 @@
 
 #include "utility.hpp"
 
+
 template <class Key, class Value>
 void BPT<Key, Value>::insert(const Key &key, const Value &value) {
   int ptr;
@@ -12,7 +13,7 @@ void BPT<Key, Value>::insert(const Key &key, const Value &value) {
     new_block.data[0] = Key_Value<Key, Value>{key, value};
     new_block.size++;
     new_block.next = -1;
-    long head_ = block_file_.write(new_block);
+    int head_ = block_file_.write(new_block);
     new_root.children[0] = head_;
     ptr = index_file_.write(new_root);
     block_file_.write_info(head_, 1);
@@ -22,11 +23,11 @@ void BPT<Key, Value>::insert(const Key &key, const Value &value) {
     return;
   }
 
-  sjtu::vector<sjtu::pair<long, int>> path;
-  long leaf_addr = findLeafNode(key, path);
+  sjtu::vector<sjtu::pair<int, int>> path;
+  int leaf_addr = findLeafNode(key, path);
 
   Key split_key;
-  long new_leaf_addr;
+  int new_leaf_addr;
   bool leaf_split =
       insertIntoLeaf(leaf_addr, key, value, split_key, new_leaf_addr);
 
@@ -36,13 +37,18 @@ void BPT<Key, Value>::insert(const Key &key, const Value &value) {
 }
 
 template <class Key, class Value>
+void BPT<Key, Value>::remove(const Key &key, const Value &value){
+
+}
+
+template <class Key, class Value>
 sjtu::vector<Value> BPT<Key, Value>::find(const Key &key) {
   sjtu::vector<Value> result;
   size_t level = 1;
   int ptr;
   index_file_.get_info(ptr, 1);
   int height;
-  index_file_.get_info(ptr, 2);
+  index_file_.get_info(height, 2);
   if (ptr == -1) {
     return result;
   }
@@ -61,7 +67,14 @@ sjtu::vector<Value> BPT<Key, Value>::find(const Key &key) {
   Block<Key, Value> block;
   block_file_.read(block, ptr);
   idx = binarySearch(block.data, key, 0, block.size - 1);
-  if (idx >= block.size || block.data[idx].key > key) {
+  if(idx >= block.size){
+    ptr = block.next;
+    if (ptr == -1) {
+      return result;
+    }
+    block_file_.read(block, ptr);
+    idx = 0;
+  }else if (block.data[idx].key > key) {
     return result;
   }
   while (true) {
@@ -82,8 +95,8 @@ sjtu::vector<Value> BPT<Key, Value>::find(const Key &key) {
 }
 
 template <class Key, class Value>
-long BPT<Key, Value>::findLeafNode(const Key &key,
-                                   sjtu::vector<sjtu::pair<long, int>> &path) {
+int BPT<Key, Value>::findLeafNode(const Key &key,
+                                   sjtu::vector<sjtu::pair<int, int>> &path) {
   int ptr, height;
   index_file_.get_info(height, 2);
   index_file_.get_info(ptr, 1);
@@ -104,14 +117,13 @@ long BPT<Key, Value>::findLeafNode(const Key &key,
 }
 
 template <class Key, class Value>
-bool BPT<Key, Value>::insertIntoLeaf(long leaf_addr, const Key &key,
+bool BPT<Key, Value>::insertIntoLeaf(int leaf_addr, const Key &key,
                                      const Value &value, Key &split_key,
-                                     long &new_leaf_addr) {
+                                     int &new_leaf_addr) {
   Block<Key, Value> leaf;
   block_file_.read(leaf, leaf_addr);
   int pos =
-      (leaf.size == 0) ? 0 : binarySearch(leaf.data, key, 0, leaf.size - 1);
-
+      (leaf.size == 0) ? 0 : binarySearch(leaf.data, {key, value}, 0, leaf.size - 1);
   for (int i = leaf.size; i > pos; --i) {
     leaf.data[i] = leaf.data[i - 1];
   }
@@ -125,8 +137,8 @@ bool BPT<Key, Value>::insertIntoLeaf(long leaf_addr, const Key &key,
 }
 
 template <class Key, class Value>
-bool BPT<Key, Value>::splitLeaf(Block<Key, Value> &leaf, long leaf_addr,
-                                Key &split_key, long &new_leaf_addr) {
+bool BPT<Key, Value>::splitLeaf(Block<Key, Value> &leaf, int leaf_addr,
+                                Key &split_key, int &new_leaf_addr) {
   int mid = (DEFAULT_LEAF_SIZE + 1) / 2;
   Block<Key, Value> new_leaf;
   new_leaf.size = DEFAULT_LEAF_SIZE + 1 - mid;
@@ -139,14 +151,13 @@ bool BPT<Key, Value>::splitLeaf(Block<Key, Value> &leaf, long leaf_addr,
   new_leaf_addr = block_file_.write(new_leaf);
   leaf.next = new_leaf_addr;
   block_file_.update(leaf, leaf_addr);
-
   return true;
 }
 
 template <class Key, class Value>
 bool BPT<Key, Value>::insertIntoParent(
-    const sjtu::vector<sjtu::pair<long, int>> &path, int level, const Key &key,
-    long right_child) {
+    const sjtu::vector<sjtu::pair<int, int>> &path, int level, const Key &key,
+    int right_child) {
   Index<Key, Value> parent;
 
   if (level < 0) {
@@ -156,7 +167,7 @@ bool BPT<Key, Value>::insertIntoParent(
     new_root.children[0] = path[0].first;
     new_root.children[1] = right_child;
 
-    long new_root_addr = index_file_.write(new_root);
+    int new_root_addr = index_file_.write(new_root);
     index_file_.write_info(new_root_addr, 1);
     int height;
     index_file_.get_info(height, 2);
@@ -179,7 +190,7 @@ bool BPT<Key, Value>::insertIntoParent(
   }
 
   Key new_split_key;
-  long new_index_addr;
+  int new_index_addr;
   bool result =
       splitInternal(parent, parent_addr, new_split_key, new_index_addr);
   if (result) {
@@ -189,8 +200,8 @@ bool BPT<Key, Value>::insertIntoParent(
 }
 
 template <class Key, class Value>
-bool BPT<Key, Value>::splitInternal(Index<Key, Value> &node, long node_addr,
-                                    Key &split_key, long &new_node_addr) {
+bool BPT<Key, Value>::splitInternal(Index<Key, Value> &node, int node_addr,
+                                    Key &split_key, int &new_node_addr) {
   Index<Key, Value> new_node;
   int split_pos = DEFAULT_ORDER / 2;
   new_node.size=DEFAULT_ORDER-split_pos-1;
@@ -204,6 +215,71 @@ bool BPT<Key, Value>::splitInternal(Index<Key, Value> &node, long node_addr,
   index_file_.update(node,node_addr);
   new_node_addr=index_file_.write(new_node);
   return true;
+}
+
+template <class Key, class Value>
+void BPT<Key, Value>::debugSearchPath(const Key &key) {
+  int ptr, height;
+  index_file_.get_info(height, 2);
+  index_file_.get_info(ptr, 1);
+  
+  std::cout << "搜索键: " << key << std::endl;
+  std::cout << "树高: " << height << std::endl;
+  
+  if (ptr == -1) {
+    std::cout << "空树" << std::endl;
+    return;
+  }
+  
+  int level = 1;
+  while (level <= height) {
+    if (level < height) {
+      Index<Key, Value> node;
+      index_file_.read(node, ptr);
+      
+      std::cout << "Level " << level << " 节点地址: " << ptr 
+                << ", 键数量: " << node.size << std::endl;
+      
+      std::cout << "  键: ";
+      for (int i = 0; i < node.size; i++) {
+        std::cout << node.keys[i] << " ";
+      }
+      std::cout << std::endl;
+      
+      std::cout << "  子节点: ";
+      for (int i = 0; i <= node.size; i++) {
+        std::cout << node.children[i] << " ";
+      }
+      std::cout << std::endl;
+      
+      int idx = (node.size == 0) ? 0 : binarySearch(node.keys, key, 0, node.size - 1);
+      std::cout << "  选择的子节点索引: " << idx 
+                << ", 地址: " << node.children[idx] << std::endl;
+      
+      ptr = node.children[idx];
+    } else {
+      Block<Key, Value> leaf;
+      block_file_.read(leaf, ptr);
+      
+      std::cout << "叶子节点地址: " << ptr 
+                << ", 大小: " << leaf.size 
+                << ", 下一个: " << leaf.next << std::endl;
+      
+      std::cout << "  键值对: ";
+      for (int i = 0; i < leaf.size; i++) {
+        std::cout << "(" << leaf.data[i].key << ":" << leaf.data[i].value << ") ";
+      }
+      std::cout << std::endl;
+      
+      int idx = (leaf.size == 0) ? 0 : binarySearch(leaf.data, key, 0, leaf.size - 1);
+      if (idx < leaf.size && leaf.data[idx].key == key) {
+        std::cout << "  找到键 " << key << " 在位置 " << idx << std::endl;
+      } else {
+        std::cout << "  键 " << key << " 未找到" << std::endl;
+      }
+    }
+    level++;
+  }
 }
 
 template class BPT<int, int>;

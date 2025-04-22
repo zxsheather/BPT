@@ -1,1 +1,10 @@
 .vscode/
+tests/
+build/
+.cache/
+*.block
+*.index
+output/
+output.txt
+test_data.txt
+standard_output.txt
