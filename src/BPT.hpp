@@ -1,8 +1,9 @@
+#include <string>
+
 #include "MemoryRiver.hpp"
 #include "utility"
 #include "utility.hpp"
 #include "vector.hpp"
-#include <string>
 
 constexpr size_t DEFAULT_ORDER = 4;
 constexpr size_t DEFAULT_LEAF_SIZE = 2;
@@ -30,19 +31,17 @@ struct Key_Value {
     return key == other.key && value == other.value;
   }
 
-  bool operator!=(const Key_Value &other) const {
-    return !(*this == other);
-  }
+  bool operator!=(const Key_Value &other) const { return !(*this == other); }
 
   bool operator<=(const Key_Value &other) const {
     return *this < other || *this == other;
   }
 };
 
-//Increment the size of keys to facilitate split
+// Increment the size of keys to facilitate split
 template <class Key, class Value>
 struct Index {
-  int children[DEFAULT_ORDER+1];
+  int children[DEFAULT_ORDER + 1];
   Key_Value<Key, Value> keys[DEFAULT_ORDER];
   size_t size;
 
@@ -67,13 +66,14 @@ struct Block {
 };
 
 template <class Key, class Value>
-int binarySearch(Key_Value<Key, Value> *array, const Key &key, int left, int right) {
+int binarySearch(Key_Value<Key, Value> *array, const Key &key, int left,
+                 int right) {
   if (left > right || left < 0) return 0;
-  
+
   // 处理边界情况
   if (key <= array[left].key) return left;
   if (key > array[right].key) return right + 1;
-  
+
   // 二分查找
   int l = left, r = right;
   while (l < r) {
@@ -90,10 +90,10 @@ int binarySearch(Key_Value<Key, Value> *array, const Key &key, int left, int rig
 template <class Key>
 int binarySearch(Key *array, const Key &key, int left, int right) {
   if (left > right || left < 0) return 0;
-  
+
   if (key <= array[left]) return left;
   if (key > array[right]) return right + 1;
-  
+
   int l = left, r = right;
   while (l < r) {
     int mid = l + (r - l) / 2;
@@ -107,7 +107,7 @@ int binarySearch(Key *array, const Key &key, int left, int right) {
 }
 
 template <typename T>
-void Qsort(sjtu::vector<T>& v, int l, int r){
+void Qsort(sjtu::vector<T> &v, int l, int r) {
   if (l >= r) return;
   T pivot = v[(l + r) / 2];
   int i = l, j = r;
@@ -129,16 +129,16 @@ template <class Key, class Value>
 class BPT {
  public:
   BPT(const std::string &filename = "database")
-  : filename_(filename),
+      : filename_(filename),
         index_file_(filename + ".index"),
         block_file_(filename + ".block") {
-    //if (!index_file_.exist()) {
-      index_file_.initialise();
-      block_file_.initialise();
-      index_file_.write_info(-1, 1);
-      block_file_.write_info(-1, 1);
-      index_file_.write_info(0, 2);
-      block_file_.write_info(0, 2);
+    // if (!index_file_.exist()) {
+    index_file_.initialise();
+    block_file_.initialise();
+    index_file_.write_info(-1, 1);
+    block_file_.write_info(-1, 1);
+    index_file_.write_info(0, 2);
+    block_file_.write_info(0, 2);
     //}
   }
   ~BPT() = default;
@@ -152,28 +152,35 @@ class BPT {
   MemoryRiver<Block<Key, Value>, 2> block_file_;
 
   // search for target leafnode and record the search path
-  int findLeafNode(const Key_Value<Key, Value> &key, sjtu::vector<sjtu::pair<int, int>> &path);
+  int findLeafNode(const Key_Value<Key, Value> &key,
+                   sjtu::vector<sjtu::pair<int, int>> &path);
 
   // insert key-value pair and return true if need split
   bool insertIntoLeaf(int leaf_addr, const Key &key, const Value &value,
                       Key_Value<Key, Value> &split_key, int &new_leaf_addr);
 
   // handle split logic
-  bool splitLeaf(Block<Key, Value> &leaf, int leaf_addr, Key_Value<Key, Value> &split_key,
-                 int &new_leaf_addr);
+  bool splitLeaf(Block<Key, Value> &leaf, int leaf_addr,
+                 Key_Value<Key, Value> &split_key, int &new_leaf_addr);
 
   // pass the split information to parent node
   bool insertIntoParent(const sjtu::vector<sjtu::pair<int, int>> &path,
-                        int level, const Key_Value<Key, Value> &key, int right_child);
+                        int level, const Key_Value<Key, Value> &key,
+                        int right_child);
 
   // split index node
-  bool splitInternal(Index<Key, Value> &node, int node_addr, Key_Value<Key, Value> &split_key,
-                  int &new_node_addr);
+  bool splitInternal(Index<Key, Value> &node, int node_addr,
+                     Key_Value<Key, Value> &split_key, int &new_node_addr);
 
-  void balanceAfterRemove(Block<Key, Value> &node, int node_addr, sjtu::vector<sjtu::pair<int,int>> &path);
-
-  void removeFromParent(Index<Key, Value> &parent, int parent_addr, int key_idx, sjtu::vector<sjtu::pair<int,int>> &path);
-
-  void balanceInternalNode(Index<Key, Value> &node, int node_addr, sjtu::vector<sjtu::pair<int, int>> &path);
+  // balance block by borrowing from siblings or merge
+  void balanceAfterRemove(Block<Key, Value> &node, int node_addr,
+                          sjtu::vector<sjtu::pair<int, int>> &path);
   
+  // adjust parent index after block merging
+  void removeFromParent(Index<Key, Value> &parent, int parent_addr, int key_idx,
+                        sjtu::vector<sjtu::pair<int, int>> &path);
+
+  // adjust parent index after index merging
+  void balanceInternalNode(Index<Key, Value> &node, int node_addr,
+                           sjtu::vector<sjtu::pair<int, int>> &path);
 };

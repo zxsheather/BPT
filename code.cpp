@@ -42,18 +42,17 @@ int main() {
       
       auto result = bpt.find(Hash(key));
       if (result.size() == 0) {
-        std::cout << "null" << std::endl;
+        std::cout << "null\n";
       } else {
         for (auto &item : result) {
-          std::cout << item << " ";
+          std::cout << item << ' ';
         }
-        std::cout << std::endl;
+        std::cout << '\n';
       }
     } else if (order == "delete") {
       std::string key;
       int value;
       std::cin >> key >> value;
-      
       bpt.remove(Hash(key), value);
     }
   }
