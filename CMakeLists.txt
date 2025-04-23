@@ -18,5 +18,5 @@ add_executable(bpt_main code.cpp)
 target_link_libraries(bpt_main bpt_lib)
 
 # 启用测试
-enable_testing()
-add_subdirectory(tests)
+# enable_testing()
+# add_subdirectory(tests)

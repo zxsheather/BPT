@@ -2,7 +2,6 @@
 #include "utility"
 #include "utility.hpp"
 #include "vector.hpp"
-#include <iostream>
 #include <string>
 
 constexpr size_t DEFAULT_ORDER = 4;
@@ -44,7 +43,7 @@ struct Key_Value {
 template <class Key, class Value>
 struct Index {
   int children[DEFAULT_ORDER+1];
-  Key keys[DEFAULT_ORDER];
+  Key_Value<Key, Value> keys[DEFAULT_ORDER];
   size_t size;
 
   Index() : size(0) {
@@ -146,32 +145,6 @@ class BPT {
   void insert(const Key &key, const Value &value);
   void remove(const Key &key, const Value &value);
   sjtu::vector<Value> find(const Key &key);
-  
-  // 打印树结构的函数
-  void printTree() {
-    int root_addr;
-    int height;
-    index_file_.get_info(root_addr, 1);
-    index_file_.get_info(height, 2);
-    
-    if (root_addr == -1) {
-      std::cout << "Empty Tree" << std::endl;
-      return;
-    }
-    
-    std::cout << "================ B+ Tree Structure ================\n";
-    std::cout << "Tree Height: " << height << std::endl;
-    
-    // 递归打印树结构
-    printNode(root_addr, 0, height);
-    
-    // 打印叶子节点链表
-    printLeafChain();
-    
-    std::cout << "==================================================\n";
-  }
-
-  void debugSearchPath(const Key&);
 
  private:
   std::string filename_;
@@ -179,102 +152,28 @@ class BPT {
   MemoryRiver<Block<Key, Value>, 2> block_file_;
 
   // search for target leafnode and record the search path
-  int findLeafNode(const Key &key, sjtu::vector<sjtu::pair<int, int>> &path);
+  int findLeafNode(const Key_Value<Key, Value> &key, sjtu::vector<sjtu::pair<int, int>> &path);
 
   // insert key-value pair and return true if need split
   bool insertIntoLeaf(int leaf_addr, const Key &key, const Value &value,
-                      Key &split_key, int &new_leaf_addr);
+                      Key_Value<Key, Value> &split_key, int &new_leaf_addr);
 
   // handle split logic
-  bool splitLeaf(Block<Key, Value> &leaf, int leaf_addr, Key &split_key,
+  bool splitLeaf(Block<Key, Value> &leaf, int leaf_addr, Key_Value<Key, Value> &split_key,
                  int &new_leaf_addr);
 
   // pass the split information to parent node
   bool insertIntoParent(const sjtu::vector<sjtu::pair<int, int>> &path,
-                        int level, const Key &key, int right_child);
+                        int level, const Key_Value<Key, Value> &key, int right_child);
 
   // split index node
-  bool splitInternal(Index<Key, Value> &node, int node_addr, Key &split_key,
+  bool splitInternal(Index<Key, Value> &node, int node_addr, Key_Value<Key, Value> &split_key,
                   int &new_node_addr);
+
+  void balanceAfterRemove(Block<Key, Value> &node, int node_addr, sjtu::vector<sjtu::pair<int,int>> &path);
+
+  void removeFromParent(Index<Key, Value> &parent, int parent_addr, int key_idx, sjtu::vector<sjtu::pair<int,int>> &path);
+
+  void balanceInternalNode(Index<Key, Value> &node, int node_addr, sjtu::vector<sjtu::pair<int, int>> &path);
   
-  // 打印节点的辅助函数
-  void printNode(int node_addr, int level, int height) {
-    std::string indent(level * 4, ' ');
-    
-    if (level == height - 1) {
-      // 叶子节点
-      Block<Key, Value> leaf;
-      block_file_.read(leaf, node_addr);
-      
-      std::cout << indent << "Leaf Node [addr=" << node_addr 
-                << ", size=" << leaf.size << ", next=" << leaf.next << "]" << std::endl;
-      
-      std::cout << indent << "  ";
-      for (size_t i = 0; i < leaf.size; i++) {
-        std::cout << "(" << leaf.data[i].key << ":" << leaf.data[i].value << ") ";
-      }
-      std::cout << std::endl;
-    } else {
-      // 内部节点
-      Index<Key, Value> node;
-      index_file_.read(node, node_addr);
-      
-      std::cout << indent << "Internal Node [addr=" << node_addr 
-                << ", size=" << node.size << "]" << std::endl;
-      
-      // 打印键
-      std::cout << indent << "  Keys: ";
-      for (size_t i = 0; i < node.size; i++) {
-        std::cout << node.keys[i] << " ";
-      }
-      std::cout << std::endl;
-      
-      // 打印子节点指针
-      std::cout << indent << "  Ptrs: ";
-      for (size_t i = 0; i <= node.size; i++) {
-        std::cout << node.children[i] << " ";
-      }
-      std::cout << std::endl;
-      
-      // 递归打印子节点
-      for (size_t i = 0; i <= node.size; i++) {
-        printNode(node.children[i], level + 1, height);
-      }
-    }
-  }
-  
-  // 打印叶子节点链表
-  void printLeafChain() {
-    int head_addr;
-    block_file_.get_info(head_addr, 1);
-    
-    if (head_addr == -1) {
-      std::cout << "Empty leaf chain" << std::endl;
-      return;
-    }
-    
-    std::cout << "Leaf Chain: ";
-    int current = head_addr;
-    int count = 0;
-    const int max_print = 10; // 限制打印数量，避免链表过长
-    
-    while (current != -1 && count < max_print) {
-      // std::cout << current;
-      
-      Block<Key, Value> leaf;
-      block_file_.read(leaf, current);
-      std::cout << "[" << current << ": ";
-      for (size_t i = 0; i < leaf.size; i++) {
-        std::cout << "(" << leaf.data[i].key << ":" << leaf.data[i].value << ") ";
-      }
-      std::cout << "]";
-      current = leaf.next;
-      
-      if (current != -1) std::cout << " -> ";
-      count++;
-    }
-    
-    if (current != -1) std::cout << " -> ...";
-    std::cout << std::endl;
-  }
 };
