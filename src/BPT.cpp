@@ -3,9 +3,7 @@
 
 template <class Key, class Value>
 void BPT<Key, Value>::insert(const Key &key, const Value &value) {
-  int ptr;
-  index_file_.get_info(ptr, 1);
-  if (ptr == -1) {
+  if (root_ == -1) {
     Index<Key, Value> new_root;
     Block<Key, Value> new_block;
     new_block.data[0] = Key_Value<Key, Value>{key, value};
@@ -13,11 +11,11 @@ void BPT<Key, Value>::insert(const Key &key, const Value &value) {
     new_block.next = -1;
     int head_ = block_file_.write(new_block);
     new_root.children[0] = head_;
-    ptr = index_file_.write(new_root);
+    root_ = index_file_.write(new_root);
     block_file_.write_info(head_, 1);
-    index_file_.write_info(ptr, 1);
+    index_file_.write_info(root_, 1);
     index_file_.write_info(1, 2);
-    block_file_.write_info(1, 2);
+    height_ = 1;
     return;
   }
 
@@ -53,7 +51,7 @@ void BPT<Key, Value>::remove(const Key &key, const Value &value) {
     leaf.data[i] = leaf.data[i + 1];
   }
   leaf.size--;
-  if (leaf.size >= (DEFAULT_LEAF_SIZE + 1) / 2) {
+  if (leaf.size >= (DEFAULT_LEAF_SIZE + 1) / 4) {
     block_file_.update(leaf, leaf_addr);
     return;
   }
@@ -64,14 +62,11 @@ template <class Key, class Value>
 sjtu::vector<Value> BPT<Key, Value>::find(const Key &key) {
   sjtu::vector<Value> result;
   size_t level = 1;
-  int ptr;
-  index_file_.get_info(ptr, 1);
-  int height;
-  index_file_.get_info(height, 2);
+  int ptr = root_;
   if (ptr == -1) {
     return result;
   }
-  while (level != height) {
+  while (level != height_) {
     Index<Key, Value> index;
     index_file_.read(index, ptr);
     int idx = binarySearch(index.keys, key, 0, index.size - 1);
@@ -116,17 +111,14 @@ sjtu::vector<Value> BPT<Key, Value>::find(const Key &key) {
 template <class Key, class Value>
 int BPT<Key, Value>::findLeafNode(const Key_Value<Key, Value> &key,
                                   sjtu::vector<sjtu::pair<int, int>> &path) {
-  int ptr, height;
-  index_file_.get_info(height, 2);
-  index_file_.get_info(ptr, 1);
+  int ptr = root_;
   path.clear();
   if (ptr == -1) {
     return -1;
   }
-  for (int level = 1; level <= height; level++) {
+  for (int level = 1; level <= height_; level++) {
     Index<Key, Value> node;
     index_file_.read(node, ptr);
-
     int idx =
         (node.size == 0) ? 0 : binarySearchForBigOrEqual(node.keys, key, 0, node.size - 1);
     path.push_back({ptr, idx});
@@ -190,12 +182,10 @@ bool BPT<Key, Value>::insertIntoParent(
     new_root.keys[0] = key;
     new_root.children[0] = path[0].first;
     new_root.children[1] = right_child;
-
-    int new_root_addr = index_file_.write(new_root);
-    index_file_.write_info(new_root_addr, 1);
-    int height;
-    index_file_.get_info(height, 2);
-    index_file_.write_info(height + 1, 2);
+    root_ = index_file_.write(new_root);
+    index_file_.write_info(root_, 1);
+    height_++;
+    index_file_.write_info(height_ , 2);
     return true;
   }
   auto [parent_addr, child_idx] = path[level];
@@ -256,6 +246,8 @@ void BPT<Key, Value>::balanceAfterRemove(
   // Rmk: only root can have size of 0.
   if (parent.size == 0) {
     if (node.size == 0) {
+      root_ = -1;
+      height_ = 0;
       index_file_.write_info(-1, 1);
       index_file_.write_info(0, 2);
       return;
@@ -335,16 +327,16 @@ void BPT<Key, Value>::removeFromParent(
   parent.size--;
   if (path.empty() && parent.size == 0) {
     index_file_.update(parent, parent_addr);
-    int height;
-    index_file_.get_info(height, 2);
-    if(height == 1){
+    if(height_ == 1){
       return;
     }
-    index_file_.write_info(parent.children[0], 1);
-    index_file_.write_info(height - 1, 2);
+    root_ = parent.children[0];
+    height_ --;
+    index_file_.write_info(root_, 1);
+    index_file_.write_info(height_ , 2);
     return;
   }
-  if (path.empty() || parent.size >= DEFAULT_ORDER / 2) {
+  if (path.empty() || parent.size >= DEFAULT_ORDER / 4) {
     index_file_.update(parent, parent_addr);
     return;
   }

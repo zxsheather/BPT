@@ -1,11 +1,10 @@
 #include <string>
 #include "MemoryRiver.hpp"
-#include "utility"
 #include "utility.hpp"
 #include "vector.hpp"
 
-constexpr size_t DEFAULT_ORDER = 3;
-constexpr size_t DEFAULT_LEAF_SIZE = 2;
+constexpr size_t DEFAULT_ORDER = 50;
+constexpr size_t DEFAULT_LEAF_SIZE = 3000;
 
 template <class Key, class Value>
 struct Key_Value {
@@ -73,11 +72,9 @@ int binarySearch(Key_Value<Key, Value> *array, const Key &key, int left,
                  int right) {
   if (left > right || left < 0) return 0;
 
-  // 处理边界情况
   if (key <= array[left].key) return left;
   if (key > array[right].key) return right + 1;
 
-  // 二分查找
   int l = left, r = right;
   while (l < r) {
     int mid = l + (r - l) / 2;
@@ -163,6 +160,11 @@ class BPT {
       block_file_.write_info(-1, 1);
       index_file_.write_info(0, 2);
       block_file_.write_info(0, 2);
+      root_ = -1;
+      height_ = -1;
+    }else{
+      index_file_.get_info(root_, 1);
+      index_file_.get_info(height_, 2);
     }
   }
   ~BPT() = default;
@@ -174,6 +176,8 @@ class BPT {
   std::string filename_;
   MemoryRiver<Index<Key, Value>, 2> index_file_;
   MemoryRiver<Block<Key, Value>, 2> block_file_;
+  int root_;
+  int height_;
 
   // search for target leafnode and record the search path
   int findLeafNode(const Key_Value<Key, Value> &key,

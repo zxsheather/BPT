@@ -3,7 +3,6 @@
 #include "src/BPT.hpp"
 #include "src/vector.hpp"
 
-template class BPT<int, int>;
 
 constexpr int PR = 31;
 constexpr int MOD = 1e9 + 7;
@@ -16,14 +15,7 @@ int Hash(const std::string &s) {
   return hash;
 }
 
-// 调试模式标志
-const bool DEBUG_MODE = false;  
-
-
-
 int main() {
-  // freopen("test_data.txt", "r", stdin);
-  // freopen("output.txt", "w", stdout);
   int n;
   std::cin >> n;
   BPT<int, int> bpt("database");

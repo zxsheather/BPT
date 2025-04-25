@@ -4,6 +4,8 @@ build/
 .cache/
 *.block
 *.index
+2697.cpp
+merge_code.py
 output/
 output.txt
 test_data.txt
