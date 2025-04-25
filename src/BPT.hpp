@@ -4,7 +4,7 @@
 #include "vector.hpp"
 
 constexpr size_t DEFAULT_ORDER = 50;
-constexpr size_t DEFAULT_LEAF_SIZE = 3000;
+constexpr size_t DEFAULT_LEAF_SIZE = 500;
 
 template <class Key, class Value>
 struct Key_Value {
