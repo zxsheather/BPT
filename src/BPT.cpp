@@ -1,5 +1,4 @@
 #include "BPT.hpp"
-
 #include "utility.hpp"
 
 template <class Key, class Value>
@@ -129,12 +128,14 @@ int BPT<Key, Value>::findLeafNode(const Key_Value<Key, Value> &key,
     index_file_.read(node, ptr);
 
     int idx =
-        (node.size == 0) ? 0 : binarySearch(node.keys, key, 0, node.size - 1);
+        (node.size == 0) ? 0 : binarySearchForBigOrEqual(node.keys, key, 0, node.size - 1);
     path.push_back({ptr, idx});
     ptr = node.children[idx];
   }
   return ptr;
 }
+
+
 
 template <class Key, class Value>
 bool BPT<Key, Value>::insertIntoLeaf(int leaf_addr, const Key &key,
@@ -333,8 +334,12 @@ void BPT<Key, Value>::removeFromParent(
   }
   parent.size--;
   if (path.empty() && parent.size == 0) {
+    index_file_.update(parent, parent_addr);
     int height;
     index_file_.get_info(height, 2);
+    if(height == 1){
+      return;
+    }
     index_file_.write_info(parent.children[0], 1);
     index_file_.write_info(height - 1, 2);
     return;
@@ -389,8 +394,8 @@ void BPT<Key, Value>::balanceInternalNode(
     if (right_sibling.size > DEFAULT_ORDER / 2) {
       node.keys[node.size] = parent.keys[node_idx];
       node.children[node.size + 1] = right_sibling.children[0];
-      node.size++;
       parent.keys[node_idx] = right_sibling.keys[0];
+      node.size++;
       for (int i = 0; i < right_sibling.size - 1; ++i) {
         right_sibling.keys[i] = right_sibling.keys[i + 1];
       }
@@ -426,7 +431,7 @@ void BPT<Key, Value>::balanceInternalNode(
     }
     node.size += right_sibling.size + 1;
     index_file_.update(node, node_addr);
-    removeFromParent(parent, parent_addr, node_idx + 1, path);
+    removeFromParent(parent, parent_addr, node_idx , path);
   }
 }
 

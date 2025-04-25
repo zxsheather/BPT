@@ -1,11 +1,10 @@
 #include <string>
-
 #include "MemoryRiver.hpp"
 #include "utility"
 #include "utility.hpp"
 #include "vector.hpp"
 
-constexpr size_t DEFAULT_ORDER = 4;
+constexpr size_t DEFAULT_ORDER = 3;
 constexpr size_t DEFAULT_LEAF_SIZE = 2;
 
 template <class Key, class Value>
@@ -35,6 +34,10 @@ struct Key_Value {
 
   bool operator<=(const Key_Value &other) const {
     return *this < other || *this == other;
+  }
+
+  bool operator>=(const Key_Value &other) const {
+    return *this > other || *this == other;
   }
 };
 
@@ -106,6 +109,27 @@ int binarySearch(Key *array, const Key &key, int left, int right) {
   return l;
 }
 
+template <class Key>
+int binarySearchForBigOrEqual(Key *array, const Key &key, int left, int right){
+  if (left > right || left < 0) return 0;
+
+  if (key < array[left]) return left;
+  if (key >= array[right]) return right + 1;
+
+  int l = left, r = right;
+  while (l < r) {
+    int mid = l + (r - l) / 2;
+    if (array[mid] < key) {
+      l = mid + 1;
+    } else if(array[mid] > key){
+      r = mid;
+    } else {
+      return mid+1;
+    }
+  }
+  return l;
+}
+
 template <typename T>
 void Qsort(sjtu::vector<T> &v, int l, int r) {
   if (l >= r) return;
@@ -132,14 +156,14 @@ class BPT {
       : filename_(filename),
         index_file_(filename + ".index"),
         block_file_(filename + ".block") {
-    // if (!index_file_.exist()) {
-    index_file_.initialise();
-    block_file_.initialise();
-    index_file_.write_info(-1, 1);
-    block_file_.write_info(-1, 1);
-    index_file_.write_info(0, 2);
-    block_file_.write_info(0, 2);
-    //}
+    if (!index_file_.exist()) {
+      index_file_.initialise();
+      block_file_.initialise();
+      index_file_.write_info(-1, 1);
+      block_file_.write_info(-1, 1);
+      index_file_.write_info(0, 2);
+      block_file_.write_info(0, 2);
+    }
   }
   ~BPT() = default;
   void insert(const Key &key, const Value &value);
@@ -154,6 +178,7 @@ class BPT {
   // search for target leafnode and record the search path
   int findLeafNode(const Key_Value<Key, Value> &key,
                    sjtu::vector<sjtu::pair<int, int>> &path);
+
 
   // insert key-value pair and return true if need split
   bool insertIntoLeaf(int leaf_addr, const Key &key, const Value &value,
