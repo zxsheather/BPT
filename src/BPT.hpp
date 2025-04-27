@@ -1,10 +1,11 @@
 #include <string>
+
 #include "MemoryRiver.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
 
-constexpr size_t DEFAULT_ORDER = 50;
-constexpr size_t DEFAULT_LEAF_SIZE = 500;
+constexpr size_t DEFAULT_ORDER = 512;
+constexpr size_t DEFAULT_LEAF_SIZE = 1024;
 
 template <class Key, class Value>
 struct Key_Value {
@@ -47,11 +48,7 @@ struct Index {
   Key_Value<Key, Value> keys[DEFAULT_ORDER];
   size_t size;
 
-  Index() : size(0) {
-    for (size_t i = 0; i < DEFAULT_ORDER; ++i) {
-      children[i] = -1;
-    }
-  }
+  Index() : size(0) {}
 };
 
 template <class Key, class Value>
@@ -60,18 +57,19 @@ struct Block {
   Key_Value<Key, Value> data[DEFAULT_LEAF_SIZE + 1];
   size_t size;
 
-  Block() : next(-1), size(0) {
-    for (size_t i = 0; i < DEFAULT_LEAF_SIZE; ++i) {
-      data[i] = Key_Value<Key, Value>{};
-    }
-  }
+  Block() : next(-1), size(0) {}
+};
+
+template <class Key, class Value>
+struct pathFrame {
+  Index<Key, Value> index;
+  int index_addr;
+  int pos;
 };
 
 template <class Key, class Value>
 int binarySearch(Key_Value<Key, Value> *array, const Key &key, int left,
                  int right) {
-  if (left > right || left < 0) return 0;
-
   if (key <= array[left].key) return left;
   if (key > array[right].key) return right + 1;
 
@@ -89,8 +87,6 @@ int binarySearch(Key_Value<Key, Value> *array, const Key &key, int left,
 
 template <class Key>
 int binarySearch(Key *array, const Key &key, int left, int right) {
-  if (left > right || left < 0) return 0;
-
   if (key <= array[left]) return left;
   if (key > array[right]) return right + 1;
 
@@ -107,9 +103,7 @@ int binarySearch(Key *array, const Key &key, int left, int right) {
 }
 
 template <class Key>
-int binarySearchForBigOrEqual(Key *array, const Key &key, int left, int right){
-  if (left > right || left < 0) return 0;
-
+int binarySearchForBigOrEqual(Key *array, const Key &key, int left, int right) {
   if (key < array[left]) return left;
   if (key >= array[right]) return right + 1;
 
@@ -118,32 +112,13 @@ int binarySearchForBigOrEqual(Key *array, const Key &key, int left, int right){
     int mid = l + (r - l) / 2;
     if (array[mid] < key) {
       l = mid + 1;
-    } else if(array[mid] > key){
+    } else if (array[mid] > key) {
       r = mid;
     } else {
-      return mid+1;
+      return mid + 1;
     }
   }
   return l;
-}
-
-template <typename T>
-void Qsort(sjtu::vector<T> &v, int l, int r) {
-  if (l >= r) return;
-  T pivot = v[(l + r) / 2];
-  int i = l, j = r;
-  while (i <= j) {
-    while (v[i] < pivot) i++;
-    while (v[j] > pivot) j--;
-    if (i <= j) {
-      std::swap(v[i], v[j]);
-      i++;
-      j--;
-    }
-  }
-  Qsort(v, l, j);
-  Qsort(v, i, r);
-  return;
 }
 
 template <class Key, class Value>
@@ -161,8 +136,8 @@ class BPT {
       index_file_.write_info(0, 2);
       block_file_.write_info(0, 2);
       root_ = -1;
-      height_ = -1;
-    }else{
+      height_ = 0;
+    } else {
       index_file_.get_info(root_, 1);
       index_file_.get_info(height_, 2);
     }
@@ -181,8 +156,7 @@ class BPT {
 
   // search for target leafnode and record the search path
   int findLeafNode(const Key_Value<Key, Value> &key,
-                   sjtu::vector<sjtu::pair<int, int>> &path);
-
+                   sjtu::vector<pathFrame<Key, Value>> &path);
 
   // insert key-value pair and return true if need split
   bool insertIntoLeaf(int leaf_addr, const Key &key, const Value &value,
@@ -193,7 +167,7 @@ class BPT {
                  Key_Value<Key, Value> &split_key, int &new_leaf_addr);
 
   // pass the split information to parent node
-  bool insertIntoParent(const sjtu::vector<sjtu::pair<int, int>> &path,
+  bool insertIntoParent(const sjtu::vector<pathFrame<Key, Value>> &path,
                         int level, const Key_Value<Key, Value> &key,
                         int right_child);
 
@@ -203,13 +177,13 @@ class BPT {
 
   // balance block by borrowing from siblings or merge
   void balanceAfterRemove(Block<Key, Value> &node, int node_addr,
-                          sjtu::vector<sjtu::pair<int, int>> &path);
-  
+                          sjtu::vector<pathFrame<Key, Value>> &path);
+
   // adjust parent index after block merging
   void removeFromParent(Index<Key, Value> &parent, int parent_addr, int key_idx,
-                        sjtu::vector<sjtu::pair<int, int>> &path);
+                        sjtu::vector<pathFrame<Key, Value>> &path);
 
   // adjust parent index after index merging
   void balanceInternalNode(Index<Key, Value> &node, int node_addr,
-                           sjtu::vector<sjtu::pair<int, int>> &path);
+                           sjtu::vector<pathFrame<Key, Value>> &path);
 };
