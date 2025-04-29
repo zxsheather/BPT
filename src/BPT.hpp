@@ -78,10 +78,10 @@ class BPT {
     if (!index_file_.exist()) {
       index_file_.initialise();
       block_file_.initialise();
-      index_file_.write_info(-1, 1);
-      block_file_.write_info(-1, 1);
-      index_file_.write_info(0, 2);
-      block_file_.write_info(0, 2);
+      // index_file_.write_info(-1, 1);
+      // block_file_.write_info(-1, 1);
+      // index_file_.write_info(0, 2);
+      // block_file_.write_info(0, 2);
       root_ = -1;
       height_ = 0;
     } else {
@@ -91,6 +91,8 @@ class BPT {
   }
   ~BPT(){
     cache_manager_.flush_cache();
+    index_file_.write_info(root_, 1);
+    index_file_.write_info(height_,2);
   }
   void insert(const Key &key, const Value &value);
   void remove(const Key &key, const Value &value);

@@ -13,7 +13,7 @@ void BPT<Key, Value>::insert(const Key &key, const Value &value) {
     int head_ = cache_manager_.write_block(new_block);
     root_ = head_;
     block_file_.write_info(head_, 1);
-    index_file_.write_info(root_, 1);
+    //index_file_.write_info(root_, 1);
     height_ = 0;
     return;
   }
@@ -197,9 +197,9 @@ bool BPT<Key, Value>::insertIntoParent(
     new_root.children[1] = right_child;
     //root_ = index_file_.write(new_root);
     root_ = cache_manager_.write_index(new_root);
-    index_file_.write_info(root_, 1);
+    //index_file_.write_info(root_, 1);
     height_++;
-    index_file_.write_info(height_ , 2);
+    //index_file_.write_info(height_ , 2);
     return true;
   }
   auto [parent, parent_addr, child_idx] = path[level];
@@ -256,8 +256,8 @@ void BPT<Key, Value>::balanceAfterRemove(
     if (node.size == 0) {
       root_ = -1;
       height_ = 0;
-      index_file_.write_info(-1, 1);
-      index_file_.write_info(0, 2);
+      //index_file_.write_info(-1, 1);
+      //index_file_.write_info(0, 2);
       return;
     } else {
       //block_file_.update(node, node_addr);
@@ -349,8 +349,8 @@ void BPT<Key, Value>::removeFromParent(
   if (path.empty() && parent.size == 0) {
     root_ = parent.children[0];
     height_ --;
-    index_file_.write_info(root_, 1);
-    index_file_.write_info(height_ , 2);
+    //index_file_.write_info(root_, 1);
+    //index_file_.write_info(height_ , 2);
     return;
   }
   if (path.empty() || parent.size >= DEFAULT_ORDER / 3) {
