@@ -21,6 +21,9 @@ VALUE_RANGE=5000       # 值范围
 INSERT_RATIO=0.6       # 插入操作比例
 DELETE_RATIO=0.2       # 删除操作比例
 FIND_RATIO=0.2         # 查找操作比例
+USE_VALGRIND=false     # 是否使用Valgrind进行内存检查
+DEBUG_MODE=false       # 调试模式
+SMALL_TEST=false       # 小型测试数据
 
 # 显示帮助信息
 show_help() {
@@ -34,6 +37,9 @@ show_help() {
     echo "  --insert RATIO       设置插入操作比例 (默认: $INSERT_RATIO)"
     echo "  --delete RATIO       设置删除操作比例 (默认: $DELETE_RATIO)"
     echo "  --find RATIO         设置查找操作比例 (默认: $FIND_RATIO)"
+    echo "  --valgrind           使用Valgrind进行内存检查"
+    echo "  --debug              调试模式，输出更多信息"
+    echo "  --small              使用小型测试数据 (10操作)"
 }
 
 # 解析命令行参数
@@ -71,6 +77,19 @@ while [[ $# -gt 0 ]]; do
             FIND_RATIO="$2"
             shift 2
             ;;
+        --valgrind)
+            USE_VALGRIND=true
+            shift
+            ;;
+        --debug)
+            DEBUG_MODE=true
+            shift
+            ;;
+        --small)
+            SMALL_TEST=true
+            OPERATION_COUNT=10
+            shift
+            ;;
         *)
             echo "未知选项: $1"
             show_help
@@ -78,6 +97,14 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# 检查Valgrind是否可用
+if [ "$USE_VALGRIND" = true ]; then
+    if ! command -v valgrind &> /dev/null; then
+        echo -e "${RED}错误: Valgrind未安装，请先安装Valgrind${NC}"
+        exit 1
+    fi
+fi
 
 # 检查必要文件是否存在
 if [ ! -f "script/data_bptree_tests.py" ]; then
@@ -121,6 +148,11 @@ echo "  值范围: $VALUE_RANGE"
 echo "  插入比例: $INSERT_RATIO"
 echo "  删除比例: $DELETE_RATIO"
 echo "  查找比例: $FIND_RATIO"
+if [ "$USE_VALGRIND" = true ]; then
+    echo "  内存检查: 启用 (使用Valgrind)"
+else
+    echo "  内存检查: 禁用"
+fi
 
 PASSED=0
 FAILED=0
@@ -134,15 +166,39 @@ for ((i=1; i<=TEST_COUNT; i++)); do
     
     # 生成测试数据
     echo "生成测试数据 (种子: $SEED)..."
-    python3 script/data_bptree_tests.py \
-        --count "$OPERATION_COUNT" \
-        --index-range "$INDEX_RANGE" \
-        --value-range "$VALUE_RANGE" \
-        --insert-ratio "$INSERT_RATIO" \
-        --delete-ratio "$DELETE_RATIO" \
-        --find-ratio "$FIND_RATIO" \
-        --seed "$SEED" \
-        --output "$TEMP_DIR/test_$i.txt"
+    
+    # 如果是小型测试，使用手动创建的简单测试用例
+    if [ "$SMALL_TEST" = true ]; then
+        echo "使用简单测试数据..."
+        cat > "$TEMP_DIR/test_$i.txt" << EOF
+insert 1 100
+insert 2 200
+insert 3 300
+find 2
+insert 4 400
+find 3
+remove 2 200
+find 2
+find 1
+EOF
+    else
+        # 生成正常测试数据
+        python3 script/data_bptree_tests.py \
+            --count "$OPERATION_COUNT" \
+            --index-range "$INDEX_RANGE" \
+            --value-range "$VALUE_RANGE" \
+            --insert-ratio "$INSERT_RATIO" \
+            --delete-ratio "$DELETE_RATIO" \
+            --find-ratio "$FIND_RATIO" \
+            --seed "$SEED" \
+            --output "$TEMP_DIR/test_$i.txt"
+    fi
+    
+    # 调试模式：显示测试数据
+    if [ "$DEBUG_MODE" = true ]; then
+        echo -e "${BLUE}测试数据:${NC}"
+        cat "$TEMP_DIR/test_$i.txt"
+    fi
     
     # 运行Python标准程序
     echo "运行Python标准程序..."
@@ -152,7 +208,50 @@ for ((i=1; i<=TEST_COUNT; i++)); do
     echo "运行C++程序..."
     cd build
     rm -f database.block database.index  # 清理之前的数据文件
-    cat "../$TEMP_DIR/test_$i.txt" | ./bpt_main > "../$TEMP_DIR/output_$i.txt" 2> "../$TEMP_DIR/error_$i.txt"
+    
+    if [ "$USE_VALGRIND" = true ]; then
+        # 使用Valgrind运行 - 简化选项，减少干扰
+        echo "使用Valgrind进行内存检查..."
+        
+        # 先创建一个包含测试命令的临时脚本
+        echo "#!/bin/bash" > ../valgrind_run.sh
+        echo "cat \"../$TEMP_DIR/test_$i.txt\" | ./bpt_main" >> ../valgrind_run.sh
+        chmod +x ../valgrind_run.sh
+        
+        # 运行valgrind，使用更简单的选项
+        valgrind --tool=memcheck --leak-check=full \
+                 --log-file="../$TEMP_DIR/valgrind_$i.log" \
+                 ../valgrind_run.sh > "../$TEMP_DIR/output_$i.txt" 2> "../$TEMP_DIR/error_$i.txt"
+        
+        rm -f ../valgrind_run.sh
+        
+        # 检查Valgrind日志是否存在
+        if [ -f "../$TEMP_DIR/valgrind_$i.log" ]; then
+            # 检查Valgrind日志大小
+            log_size=$(wc -c < "../$TEMP_DIR/valgrind_$i.log")
+            echo "Valgrind日志大小: $log_size 字节"
+            
+            # 检查Valgrind日志内容
+            if [ "$log_size" -gt 100 ]; then
+                if grep -q "ERROR SUMMARY: 0 errors" "../$TEMP_DIR/valgrind_$i.log"; then
+                    echo -e "${GREEN}Valgrind未检测到内存错误${NC}"
+                else
+                    echo -e "${RED}Valgrind检测到内存错误:${NC}"
+                    grep -n -A 5 -B 5 "Invalid" "../$TEMP_DIR/valgrind_$i.log" | head -n 20 || echo "未找到无效内存访问"
+                    grep -n -A 3 "ERROR SUMMARY" "../$TEMP_DIR/valgrind_$i.log" || echo "未找到错误概要"
+                    cp "../$TEMP_DIR/valgrind_$i.log" "../valgrind_error_$i.log"
+                    echo "完整Valgrind日志已保存到: valgrind_error_$i.log"
+                fi
+            else
+                echo -e "${RED}警告: Valgrind日志文件过小，可能表明程序异常终止${NC}"
+            fi
+        else
+            echo -e "${RED}警告: Valgrind日志文件不存在${NC}"
+        fi
+    else
+        # 常规运行
+        cat "../$TEMP_DIR/test_$i.txt" | ./bpt_main > "../$TEMP_DIR/output_$i.txt" 2> "../$TEMP_DIR/error_$i.txt"
+    fi
     cd ..
     
     # 检查错误输出
@@ -167,6 +266,32 @@ for ((i=1; i<=TEST_COUNT; i++)); do
         # 为了调试目的，让我们看看输入内容
         echo -e "${YELLOW}输入内容前20行:${NC}"
         head -n 20 "$TEMP_DIR/test_$i.txt"
+        
+        # 在调试模式下，运行程序且不使用valgrind，看看能否获取更多错误信息
+        if [ "$DEBUG_MODE" = true ] && [ "$USE_VALGRIND" = true ]; then
+            echo -e "${BLUE}尝试不使用Valgrind运行，以获取更多错误信息...${NC}"
+            cd build
+            cat "../$TEMP_DIR/test_$i.txt" | ./bpt_main > "../$TEMP_DIR/direct_output_$i.txt" 2> "../$TEMP_DIR/direct_error_$i.txt"
+            cd ..
+            
+            if [ -s "$TEMP_DIR/direct_error_$i.txt" ]; then
+                echo -e "${RED}直接运行的错误输出:${NC}"
+                cat "$TEMP_DIR/direct_error_$i.txt"
+            fi
+            
+            if [ -s "$TEMP_DIR/direct_output_$i.txt" ]; then
+                echo -e "${GREEN}直接运行有输出:${NC}"
+                head -n 5 "$TEMP_DIR/direct_output_$i.txt"
+            else
+                echo -e "${RED}直接运行也没有输出${NC}"
+            fi
+        fi
+    else
+        # 如果有输出，在调试模式下显示一部分
+        if [ "$DEBUG_MODE" = true ]; then
+            echo -e "${BLUE}C++程序输出前5行:${NC}"
+            head -n 5 "$TEMP_DIR/output_$i.txt"
+        fi
     fi
     
     # 比较输出 (忽略空白差异)
