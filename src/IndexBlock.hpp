@@ -35,8 +35,8 @@ struct Key_Value {
   }
 };
 
-constexpr size_t DEFAULT_ORDER = 512;
-constexpr size_t DEFAULT_LEAF_SIZE = 1024;
+constexpr size_t DEFAULT_ORDER = 55;
+constexpr size_t DEFAULT_LEAF_SIZE = 55;
 
 // Increment the size of keys to facilitate split
 template <class Key, class Value>

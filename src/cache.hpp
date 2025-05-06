@@ -2,6 +2,8 @@
 #ifndef BPT_CACHE_HPP
 #define BPT_CACHE_HPP
 
+#include <functional>
+
 #include "HashMap.hpp"
 #include "IndexBlock.hpp"
 #include "MemoryRiver.hpp"
@@ -32,6 +34,9 @@ class LRUCache {
 
   HashMap<Key, CacheItem> cache_items_;
   HashMap<Key, ItemPosition> positions_;
+
+  using EvictionCallback = std::function<void(const Key&, const Value&)>;
+  EvictionCallback eviction_callback_ = nullptr;
 
  public:
   explicit LRUCache(size_t capacity = 1024) : capacity_(capacity) {}
@@ -140,13 +145,20 @@ class LRUCache {
     positions_.clear();
   }
 
+  void set_eviction_callback(EvictionCallback callback) {
+    eviction_callback_ = callback;
+  }
+
  private:
   void evict() {
     if (lru_list_.empty()) return;
-
     Key lru_key = lru_list_.back();
     lru_list_.pop_back();
-
+    if (cache_items_.contains(lru_key) && cache_items_.get(lru_key).dirty) {
+      if (eviction_callback_) {
+        eviction_callback_(lru_key, cache_items_.get(lru_key).value);
+      }
+    }
     cache_items_.remove(lru_key);
     positions_.remove(lru_key);
   }
@@ -164,11 +176,25 @@ class BPTCacheManager {
  public:
   BPTCacheManager(MemoryRiver<Index<Key, Value>, 2>& index_file,
                   MemoryRiver<Block<Key, Value>, 2>& block_file,
-                  size_t index_cache_size = 256, size_t block_cache_size = 512)
+                  size_t index_cache_size = 1024, size_t block_cache_size = 2048)
       : index_file_(index_file),
         block_file_(block_file),
         index_cache_(index_cache_size),
-        block_cache_(block_cache_size) {}
+        block_cache_(block_cache_size) {
+    index_cache_.set_eviction_callback(
+        [this](int addr, const Index<Key, Value>& index) {
+          if (index_cache_.is_dirty(addr)) {
+            index_file_.update(const_cast<Index<Key, Value>&>(index), addr);
+          }
+        });
+
+    block_cache_.set_eviction_callback(
+        [this](int addr, const Block<Key, Value>& block) {
+          if (block_cache_.is_dirty(addr)) {
+            block_file_.update(const_cast<Block<Key, Value>&>(block), addr);
+          }
+        });
+  }
 
   void read_index(Index<Key, Value>& index, int index_addr) {
     if (index_cache_.contains(index_addr)) {
