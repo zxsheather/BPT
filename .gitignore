@@ -5,6 +5,7 @@ build/
 *.block
 *.index
 2697.cpp
+2732.cpp
 merge_code.py
 output/
 output.txt

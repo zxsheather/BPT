@@ -4,21 +4,20 @@
 #include "src/vector.hpp"
 
 
-constexpr int PR = 31;
-constexpr int MOD = 1e9 + 7;
+constexpr long long PR = 998244353;
+constexpr long long MOD = 99234523452349217;
 
-int Hash(const std::string &s) {
-  long long hash = 0;
+long long Hash(const std::string &s) {
+  __int128_t hash = 0;
   for (char c : s) {
-    hash = (hash * PR + c) % MOD;
+    hash = (hash * PR + c + 1) % MOD;
   }
   return hash;
 }
-
 int main() {
   int n;
   std::cin >> n;
-  BPT<int, int> bpt("database");
+  BPT<long long, int> bpt("database");
   
   for (int i = 0; i < n; ++i) {
     std::string order;
