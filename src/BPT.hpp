@@ -1,64 +1,10 @@
+#pragma once
 #include <string>
 
 #include "MemoryRiver.hpp"
-#include "utility.hpp"
+#include "cache.hpp"
 #include "vector.hpp"
-
-constexpr size_t DEFAULT_ORDER = 512;
-constexpr size_t DEFAULT_LEAF_SIZE = 1024;
-
-template <class Key, class Value>
-struct Key_Value {
-  Key key;
-  Value value;
-
-  bool operator<(const Key_Value &other) const {
-    if (key == other.key) {
-      return value < other.value;
-    }
-    return key < other.key;
-  }
-
-  bool operator>(const Key_Value &other) const {
-    if (key == other.key) {
-      return value > other.value;
-    }
-    return key > other.key;
-  }
-
-  bool operator==(const Key_Value &other) const {
-    return key == other.key && value == other.value;
-  }
-
-  bool operator!=(const Key_Value &other) const { return !(*this == other); }
-
-  bool operator<=(const Key_Value &other) const {
-    return *this < other || *this == other;
-  }
-
-  bool operator>=(const Key_Value &other) const {
-    return *this > other || *this == other;
-  }
-};
-
-// Increment the size of keys to facilitate split
-template <class Key, class Value>
-struct Index {
-  int children[DEFAULT_ORDER + 1];
-  Key_Value<Key, Value> keys[DEFAULT_ORDER];
-  size_t size;
-
-  Index() : size(0) {}
-};
-
-template <class Key, class Value>
-struct Block {
-  int next;
-  Key_Value<Key, Value> data[DEFAULT_LEAF_SIZE + 1];
-  size_t size;
-
-  Block() : next(-1), size(0) {}
-};
+#include "IndexBlock.hpp"
 
 template <class Key, class Value>
 struct pathFrame {
@@ -127,14 +73,15 @@ class BPT {
   BPT(const std::string &filename = "database")
       : filename_(filename),
         index_file_(filename + ".index"),
-        block_file_(filename + ".block") {
+        block_file_(filename + ".block"),
+        cache_manager_(index_file_, block_file_) {
     if (!index_file_.exist()) {
       index_file_.initialise();
       block_file_.initialise();
-      index_file_.write_info(-1, 1);
-      block_file_.write_info(-1, 1);
-      index_file_.write_info(0, 2);
-      block_file_.write_info(0, 2);
+      // index_file_.write_info(-1, 1);
+      // block_file_.write_info(-1, 1);
+      // index_file_.write_info(0, 2);
+      // block_file_.write_info(0, 2);
       root_ = -1;
       height_ = 0;
     } else {
@@ -142,7 +89,11 @@ class BPT {
       index_file_.get_info(height_, 2);
     }
   }
-  ~BPT() = default;
+  ~BPT(){
+    cache_manager_.flush_cache();
+    index_file_.write_info(root_, 1);
+    index_file_.write_info(height_,2);
+  }
   void insert(const Key &key, const Value &value);
   void remove(const Key &key, const Value &value);
   sjtu::vector<Value> find(const Key &key);
@@ -153,6 +104,7 @@ class BPT {
   MemoryRiver<Block<Key, Value>, 2> block_file_;
   int root_;
   int height_;
+  sjtu::BPTCacheManager<Key, Value> cache_manager_;
 
   // search for target leafnode and record the search path
   int findLeafNode(const Key_Value<Key, Value> &key,
