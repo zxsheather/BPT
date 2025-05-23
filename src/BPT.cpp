@@ -62,7 +62,7 @@ sjtu::vector<Value> BPT<Key, Value>::find(const Key &key) {
   if (ptr == -1) {
     return result;
   }
-  if(height_ >= 1){
+  if (height_ >= 1) {
     while (level < height_) {
       Index<Key, Value> index;
       index_file_.read(index, ptr);
@@ -75,7 +75,7 @@ sjtu::vector<Value> BPT<Key, Value>::find(const Key &key) {
     int idx = binarySearch(index.keys, key, 0, index.size - 1);
     ptr = index.children[idx];
   }
-  
+
   Block<Key, Value> block;
   block_file_.read(block, ptr);
   int idx = binarySearch(block.data, key, 0, block.size - 1);
@@ -117,15 +117,14 @@ int BPT<Key, Value>::findLeafNode(const Key_Value<Key, Value> &key,
   for (int level = 1; level <= height_; level++) {
     Index<Key, Value> node;
     index_file_.read(node, ptr);
-    int idx =
-        (node.size == 0) ? 0 : binarySearchForBigOrEqual(node.keys, key, 0, node.size - 1);
+    int idx = (node.size == 0)
+                  ? 0
+                  : binarySearchForBigOrEqual(node.keys, key, 0, node.size - 1);
     path.push_back({node, ptr, idx});
     ptr = node.children[idx];
   }
   return ptr;
 }
-
-
 
 template <class Key, class Value>
 bool BPT<Key, Value>::insertIntoLeaf(int leaf_addr, const Key &key,
@@ -181,7 +180,7 @@ bool BPT<Key, Value>::insertIntoParent(
     root_ = index_file_.write(new_root);
     index_file_.write_info(root_, 1);
     height_++;
-    index_file_.write_info(height_ , 2);
+    index_file_.write_info(height_, 2);
     return true;
   }
   auto [parent, parent_addr, child_idx] = path[level];
@@ -314,9 +313,9 @@ void BPT<Key, Value>::removeFromParent(
   parent.size--;
   if (path.empty() && parent.size == 0) {
     root_ = parent.children[0];
-    height_ --;
+    height_--;
     index_file_.write_info(root_, 1);
-    index_file_.write_info(height_ , 2);
+    index_file_.write_info(height_, 2);
     return;
   }
   if (path.empty() || parent.size >= DEFAULT_ORDER / 3) {
@@ -403,7 +402,7 @@ void BPT<Key, Value>::balanceInternalNode(
     }
     node.size += right_sibling.size + 1;
     index_file_.update(node, node_addr);
-    removeFromParent(parent, parent_addr, node_idx , path);
+    removeFromParent(parent, parent_addr, node_idx, path);
   }
 }
 
